@@ -1,0 +1,21 @@
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import { restaurants } from './seed.js';
+
+const app = express(); const secret = process.env.JWT_SECRET || 'menuqr-development-secret';
+app.use(cors()); app.use(express.json());
+const sign = () => jwt.sign({ role:'admin', email:'admin@menuqr.local' }, secret, { expiresIn:'8h' });
+const requireAdmin = (req,res,next) => { try { jwt.verify((req.headers.authorization||'').replace('Bearer ',''),secret); next(); } catch { res.status(401).json({message:'Admin authentication required'}); } };
+app.get('/api/health', (_,res)=>res.json({status:'ok'}));
+app.post('/api/auth/login', async (req,res)=>{ const ok=req.body.email==='admin@menuqr.local' && req.body.password==='MenuQR123!'; if(!ok)return res.status(401).json({message:'Invalid email or password'}); res.json({token:sign(), user:{email:req.body.email,role:'admin'}}); });
+app.get('/api/restaurants', (_,res)=>res.json(restaurants.map(({items,...r})=>r)));
+app.get('/api/restaurants/:id/menu', (req,res)=>{const r=restaurants.find(x=>x.id===req.params.id||x.slug===req.params.id);if(!r)return res.status(404).json({message:'Restaurant not found'});res.json({restaurant:{id:r.id,slug:r.slug,name:r.name,tagline:r.tagline,address:r.address,phone:r.phone},categories:r.categories.map(name=>({name})),items:r.items});});
+app.post('/api/restaurants', requireAdmin, (req,res)=>{const slug=req.body.slug||req.body.name?.toLowerCase().replace(/[^a-z0-9]+/g,'-'); if(!req.body.name||restaurants.some(r=>r.slug===slug))return res.status(400).json({message:'A unique restaurant name is required'});const r={id:slug,slug,name:req.body.name,tagline:req.body.tagline||'Welcome to our menu.',address:req.body.address||'',phone:req.body.phone||'',cuisine:req.body.cuisine||'',categories:[],items:[],itemCount:0};restaurants.push(r);res.status(201).json(r);});
+app.put('/api/restaurants/:id', requireAdmin, (req,res)=>{const r=restaurants.find(x=>x.id===req.params.id);if(!r)return res.status(404).json({message:'Restaurant not found'});Object.assign(r,req.body);r.itemCount=r.items.length;res.json(r);});
+app.delete('/api/restaurants/:id', requireAdmin, (req,res)=>{const i=restaurants.findIndex(x=>x.id===req.params.id);if(i<0)return res.status(404).json({message:'Restaurant not found'});restaurants.splice(i,1);res.status(204).end();});
+app.get('/api/restaurants/:restaurantId/categories', (req,res)=>{const r=restaurants.find(x=>x.id===req.params.restaurantId);if(!r)return res.status(404).json({message:'Restaurant not found'});res.json(r.categories.map(name=>({name})));});
+app.get('/api/restaurants/:restaurantId/items', (req,res)=>{const r=restaurants.find(x=>x.id===req.params.restaurantId);if(!r)return res.status(404).json({message:'Restaurant not found'});res.json(r.items);});
+app.listen(process.env.PORT||4000, ()=>console.log('MenuQR API running on http://localhost:4000'));
