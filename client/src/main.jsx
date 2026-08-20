@@ -7,6 +7,7 @@ import { restaurants as seedRestaurants } from '../../server/src/seed.js';
 import './styles.css';
 
 const menuStoreKey = 'menuqr-restaurants-v1';
+const apiBase = import.meta.env.VITE_API_URL || '/api';
 const storedRestaurants = () => { try { const saved = localStorage.getItem(menuStoreKey); return saved ? JSON.parse(saved) : seedRestaurants; } catch { return seedRestaurants; } };
 const saveRestaurants = (restaurants) => localStorage.setItem(menuStoreKey, JSON.stringify(restaurants));
 const publicFallback = (path, options = {}) => {
@@ -21,7 +22,7 @@ const publicFallback = (path, options = {}) => {
   throw new Error('This operation needs the local MenuQR API.');
 };
 const api = async (path, options = {}) => {
-  try { const response = await fetch(`/api${path}`, { headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options }); if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || 'Something went wrong'); return response.json(); }
+  try { const token = localStorage.getItem('menuqr-token'); const response = await fetch(`${apiBase}${path}`, { headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) }, ...options }); if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || 'Something went wrong'); return response.json(); }
   catch { return publicFallback(path, options); }
 };
 const money = (n) => `₹${n}`;
@@ -53,7 +54,7 @@ function Admin() {
   const [restaurants,setRestaurants]=useState([]); const [selected,setSelected]=useState(null); const [tab,setTab]=useState('overview'); const [editing,setEditing]=useState(false); const token=localStorage.getItem('menuqr-token'); const nav=useNavigate();
   useEffect(()=>{if(!token) nav('/admin/login'); else api('/restaurants').then(setRestaurants).catch(()=>nav('/admin/login'));},[token,nav]);
   const current=selected||restaurants[0]; const url=current?`${location.origin}${location.pathname}#/r/${current.slug}`:'';
-  const updateMenu = (change) => { const next = storedRestaurants().map(r => r.id === current.id ? change(structuredClone(r)) : r); saveRestaurants(next); setRestaurants(next.map(({items,...r})=>({...r,itemCount:items.length}))); setSelected(next.find(r=>r.id===current.id)); };
+  const updateMenu = (change) => { const next = storedRestaurants().map(r => r.id === current.id ? change(structuredClone(r)) : r); const updated = next.find(r=>r.id===current.id); saveRestaurants(next); setRestaurants(next.map(({items,...r})=>({...r,itemCount:items.length}))); setSelected(updated); fetch(`${apiBase}/restaurants/${updated.id}`, { method:'PUT', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body:JSON.stringify(updated) }).catch(() => {}); };
   const updateItem = (id, field, value) => updateMenu(r => { const item=r.items.find(i=>i.id===id); item[field]=field==='price'?Number(value):value; r.itemCount=r.items.length; return r; });
   const addItem = () => updateMenu(r => { const category=r.categories[0]||'Mains'; r.items.push({id:`${r.slug}-${Date.now()}`,name:'New menu item',description:'Describe this dish',price:0,vegetarian:true,available:true,category,allergens:[],image:'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=700&q=82'}); r.itemCount=r.items.length; return r; });
   const removeItem = id => updateMenu(r => { r.items=r.items.filter(i=>i.id!==id); r.itemCount=r.items.length; return r; });
