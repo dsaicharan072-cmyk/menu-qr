@@ -20,6 +20,7 @@ async function startDatabase() {
   const databaseUrl = process.env.MENUQR_DATABASE_URL || process.env.DATABASE_URL;
   if (!databaseUrl) return;
   pool = new Pool({ connectionString: databaseUrl, ssl: databaseUrl.includes('localhost') ? false : { rejectUnauthorized: false } });
+  pool.on('error', (err) => { console.error('Unexpected error on idle pg client:', err.message); });
   await pool.query('CREATE TABLE IF NOT EXISTS menuqr_restaurants (id TEXT PRIMARY KEY, data JSONB NOT NULL)');
   await pool.query('CREATE TABLE IF NOT EXISTS menuqr_owners (email TEXT PRIMARY KEY, password_hash TEXT NOT NULL, restaurant_id TEXT NOT NULL)');
   const count = await pool.query('SELECT COUNT(*)::int AS count FROM menuqr_restaurants');
