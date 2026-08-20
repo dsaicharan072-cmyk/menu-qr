@@ -28,7 +28,7 @@ const publicFallback = (path, options = {}) => {
 };
 const api = async (path, options = {}) => {
   try { const token = localStorage.getItem('menuqr-token'); const response = await fetch(`${apiBase}${path}`, { headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) }, ...options }); if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || 'Something went wrong'); return response.json(); }
-  catch (error) { if (error instanceof TypeError) return publicFallback(path, options); throw error; }
+  catch (error) { return publicFallback(path, options); }
 };
 const money = (n) => `₹${n}`;
 
