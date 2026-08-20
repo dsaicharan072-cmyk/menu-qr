@@ -9,7 +9,7 @@ import './styles.css';
 const menuStoreKey = 'menuqr-restaurants-v1';
 const accountStoreKey = 'menuqr-accounts-v1';
 const sessionStoreKey = 'menuqr-user-v1';
-const apiBase = import.meta.env.VITE_API_URL || '/api';
+const apiBase = import.meta.env.VITE_API_URL || 'https://menuqr-api-hpyb.onrender.com/api';
 const storedRestaurants = () => { try { const saved = localStorage.getItem(menuStoreKey); return saved ? JSON.parse(saved) : seedRestaurants; } catch { return seedRestaurants; } };
 const saveRestaurants = (restaurants) => localStorage.setItem(menuStoreKey, JSON.stringify(restaurants));
 const storedAccounts = () => { try { return JSON.parse(localStorage.getItem(accountStoreKey) || '[]'); } catch { return []; } };
@@ -28,7 +28,7 @@ const publicFallback = (path, options = {}) => {
 };
 const api = async (path, options = {}) => {
   try { const token = localStorage.getItem('menuqr-token'); const response = await fetch(`${apiBase}${path}`, { headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) }, ...options }); if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || 'Something went wrong'); return response.json(); }
-  catch { return publicFallback(path, options); }
+  catch (error) { if (error instanceof TypeError) return publicFallback(path, options); throw error; }
 };
 const money = (n) => `₹${n}`;
 
@@ -66,7 +66,7 @@ function Admin() {
   const ownRestaurant = session?.restaurantId ? storedRestaurants().find(r=>r.id===session.restaurantId) : null;
   const current=selected||ownRestaurant||storedRestaurants().find(r=>r.id===restaurants[0]?.id)||restaurants[0]; const url=current?`${location.origin}${location.pathname}#/r/${current.slug}`:'';
   const openEditor = async () => { if (!current) return; try { const data = await api(`/restaurants/${current.id}/menu`); const full = { ...current, ...data.restaurant, categories:data.categories.map(c=>c.name), items:data.items, itemCount:data.items.length }; const next = storedRestaurants().map(r=>r.id===full.id?full:r); saveRestaurants(next); setSelected(full); } catch { setSelected({ ...current, categories:current.categories || ['Mains'], items:current.items || [] }); } setEditing(true); };
-  const updateMenu = (change) => { const next = storedRestaurants().map(r => r.id === current.id ? change(structuredClone(r)) : r); const updated = next.find(r=>r.id===current.id); saveRestaurants(next); setRestaurants(next.map(({items,...r})=>({...r,itemCount:items.length}))); setSelected(updated); };
+  const updateMenu = (change) => { const updated = change(structuredClone(current)); const cached = storedRestaurants().filter(r=>r.id!==current.id); saveRestaurants([...cached,updated]); setRestaurants(previous=>previous.map(r=>r.id===updated.id?{...r,...updated,itemCount:updated.items.length}:r)); setSelected(updated); };
   const requestCrud = (path, method, body) => fetch(`${apiBase}${path}`, { method, headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, ...(body ? {body:JSON.stringify(body)} : {}) }).catch(() => {});
   const updateItem = (id, field, value) => { const item={...current.items.find(i=>i.id===id),[field]:field==='price'?Number(value):value}; updateMenu(r => { Object.assign(r.items.find(i=>i.id===id),item); return r; }); requestCrud(`/restaurants/${current.id}/items/${id}`,'PUT',item); };
   const addItem = () => { const item={id:`${current.slug}-${Date.now()}`,name:'New menu item',description:'Describe this dish',price:0,vegetarian:true,available:true,category:current.categories[0]||'Mains',allergens:[],image:'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=700&q=82'}; updateMenu(r => { r.items.push(item); r.itemCount=r.items.length; return r; }); requestCrud(`/restaurants/${current.id}/items`,'POST',item); };
