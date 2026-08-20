@@ -17,8 +17,9 @@ const normalise = restaurant => ({ ...restaurant, id: restaurant.id || restauran
 const slugify = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `restaurant-${Date.now()}`;
 
 async function startDatabase() {
-  if (!process.env.DATABASE_URL) return;
-  pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false } });
+  const databaseUrl = process.env.MENUQR_DATABASE_URL || process.env.DATABASE_URL;
+  if (!databaseUrl) return;
+  pool = new Pool({ connectionString: databaseUrl, ssl: databaseUrl.includes('localhost') ? false : { rejectUnauthorized: false } });
   await pool.query('CREATE TABLE IF NOT EXISTS menuqr_restaurants (id TEXT PRIMARY KEY, data JSONB NOT NULL)');
   await pool.query('CREATE TABLE IF NOT EXISTS menuqr_owners (email TEXT PRIMARY KEY, password_hash TEXT NOT NULL, restaurant_id TEXT NOT NULL)');
   const count = await pool.query('SELECT COUNT(*)::int AS count FROM menuqr_restaurants');
