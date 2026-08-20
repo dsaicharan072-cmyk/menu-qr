@@ -59,7 +59,9 @@ function Register() { const nav=useNavigate(); const [restaurantName,setRestaura
 
 function Admin() {
   const [restaurants,setRestaurants]=useState([]); const [selected,setSelected]=useState(null); const [tab,setTab]=useState('overview'); const [editing,setEditing]=useState(false); const token=localStorage.getItem('menuqr-token'); const nav=useNavigate();
-  const session = JSON.parse(localStorage.getItem(sessionStoreKey) || 'null');
+  const savedSession = JSON.parse(localStorage.getItem(sessionStoreKey) || 'null');
+  const legacyRestaurantId = token?.startsWith('local-') ? token.replace('local-', '') : null;
+  const session = savedSession || (legacyRestaurantId ? { role:'owner', restaurantId:legacyRestaurantId } : null);
   useEffect(()=>{if(!token) nav('/admin/login'); else api('/restaurants').then(all=>setRestaurants(session?.restaurantId ? all.filter(r=>r.id===session.restaurantId) : all)).catch(()=>nav('/admin/login'));},[token,nav]);
   const ownRestaurant = session?.restaurantId ? storedRestaurants().find(r=>r.id===session.restaurantId) : null;
   const current=selected||ownRestaurant||storedRestaurants().find(r=>r.id===restaurants[0]?.id)||restaurants[0]; const url=current?`${location.origin}${location.pathname}#/r/${current.slug}`:'';
