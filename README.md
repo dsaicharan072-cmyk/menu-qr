@@ -1,5 +1,7 @@
 # MenuQR
 
+MenuQR stores restaurant accounts and menus in the hosted database, so one restaurant's QR menu works on every device.
+
 A multi-restaurant, QR-based digital menu application. Guests scan a table QR code and browse a restaurant-specific menu without sign-in, ordering, payments, carts, or delivery tracking.
 
 ## Run locally
