@@ -7,6 +7,7 @@ import { Pool } from 'pg';
 import { restaurants as seedRestaurants } from './seed.js';
 
 const app = express();
+// The hosted API reads and writes the shared restaurant database.
 const secret = process.env.JWT_SECRET || 'menuqr-development-secret';
 const localRestaurants = structuredClone(seedRestaurants);
 const localOwners = new Map();
