@@ -45,7 +45,7 @@ function DemoQr() {
 
 function CustomerMenu() {
   const { restaurantId } = useParams(); const [data, setData] = useState(null); const [active, setActive] = useState('All'); const [search, setSearch] = useState(''); const [selected, setSelected] = useState(null);
-  useEffect(() => { api(`/restaurants/${restaurantId}/menu`).then(setData).catch(() => setData({ error: true })); }, [restaurantId]);
+  useEffect(() => { let mounted=true; const load=()=>api(`/restaurants/${restaurantId}/menu`).then(menu=>mounted&&setData(menu)).catch(()=>mounted&&setData({ error:true })); load(); const refresh=()=>load(); window.addEventListener('menuqr-menu-updated',refresh); const interval=window.setInterval(load,5000); return()=>{mounted=false;window.removeEventListener('menuqr-menu-updated',refresh);window.clearInterval(interval)}; }, [restaurantId]);
   if (!data) return <div className="center"><Clock3 /> Loading menu…</div>;
   if (data.error) return <div className="center">Restaurant menu not found.</div>;
   const categories = ['All', ...data.categories.map(c => c.name)];
@@ -66,7 +66,7 @@ function Admin() {
   const ownRestaurant = session?.restaurantId ? storedRestaurants().find(r=>r.id===session.restaurantId) : null;
   const current=selected||ownRestaurant||restaurants[0]; const url=current?`${location.origin}${location.pathname}#/r/${current.slug}`:'';
   const openEditor = async () => { if (!current) return; try { const data = await api(`/restaurants/${current.id}/menu`); const full = { ...current, ...data.restaurant, categories:data.categories.map(c=>c.name), items:data.items, itemCount:data.items.length }; const next = storedRestaurants().map(r=>r.id===full.id?full:r); saveRestaurants(next); setSelected(full); } catch { setSelected({ ...current, categories:current.categories || ['Mains'], items:current.items || [] }); } setEditing(true); };
-  const updateMenu = (change) => { const updated = change(structuredClone(current)); const cached = storedRestaurants().filter(r=>r.id!==current.id); saveRestaurants([...cached,updated]); setRestaurants(previous=>previous.map(r=>r.id===updated.id?{...r,...updated,itemCount:updated.items.length}:r)); setSelected(updated); };
+  const updateMenu = (change) => { const updated = change(structuredClone(current)); const cached = storedRestaurants().filter(r=>r.id!==current.id); saveRestaurants([...cached,updated]); window.dispatchEvent(new Event('menuqr-menu-updated')); setRestaurants(previous=>previous.map(r=>r.id===updated.id?{...r,...updated,itemCount:updated.items.length}:r)); setSelected(updated); };
   const requestCrud = (path, method, body) => fetch(`${apiBase}${path}`, { method, headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, ...(body ? {body:JSON.stringify(body)} : {}) }).catch(() => {});
   const updateItem = (id, field, value) => { const item={...current.items.find(i=>i.id===id),[field]:field==='price'?Number(value):value}; updateMenu(r => { Object.assign(r.items.find(i=>i.id===id),item); return r; }); requestCrud(`/restaurants/${current.id}/items/${id}`,'PUT',item); };
   const addItem = () => { const item={id:`${current.slug}-${Date.now()}`,name:'New menu item',description:'Describe this dish',price:0,vegetarian:true,available:true,category:current.categories[0]||'Mains',allergens:[],image:'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=700&q=82'}; updateMenu(r => { r.items.push(item); r.itemCount=r.items.length; return r; }); requestCrud(`/restaurants/${current.id}/items`,'POST',item); };
